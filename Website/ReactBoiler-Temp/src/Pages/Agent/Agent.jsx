@@ -57,7 +57,7 @@ function ChatContent({ onTitleChange }) {
       annotations.forEach((annotation, index) => {
         const marker = annotation.text; // e.g., "【4:1†source】"
         const footnoteNumber = index + 1;
-        const footnoteText = `<sup>${footnoteNumber}</sup>`; // Use superscript for citation
+        const footnoteText = ``; // Use superscript for citation
 
         // Replace the annotation marker in the content
         content = content.replace(marker, footnoteText);

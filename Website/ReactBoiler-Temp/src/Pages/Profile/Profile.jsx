@@ -39,6 +39,29 @@ export default function Profile() {
     }
   }, [user]);
 
+  const handleDownloadPdf = async (id) => {
+    setIsDownloading(true);
+    try {
+      const response = await fetch(`/api/get_application_pdf/${id}`, {
+        method: 'GET',
+      });
+      if (!response.ok) throw new Error('Failed to download PDF');
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `application_${id}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const handleDelete = async (applicationId) => {
     if (window.confirm("Are you sure you want to delete this application?")) {
       try {
@@ -89,7 +112,7 @@ export default function Profile() {
                 <p className="text-gray-600"><strong>Name:</strong> {user.displayName || 'N/A'}</p>
                 <p className="text-gray-600"><strong>Email:</strong> {user.email || 'N/A'}</p>
               </div>
-              <div>
+              <div className='flex justify-end items-center'>
                 <Link to="/pension-form" className="bg-teal-500 text-white px-6 py-3 rounded-lg font-medium hover:bg-teal-600 transition-colors inline-block">
                   Start New Application
                 </Link>
@@ -126,13 +149,18 @@ export default function Profile() {
                     {report.submissionDate ? new Date(report.submissionDate).toLocaleDateString() : 'Date N/A'}
                   </p>
                   <div className="flex justify-between items-center">
-                    <Link to={`/reports/${report._id}`} className="text-teal-500 hover:underline font-medium">
-                      View Details
-                    </Link>
-                    <button onClick={() => handleDelete(report._id)} className="text-red-500 hover:text-red-700" title="Delete Application">
-                      <FaTrash />
-                    </button>
-                  </div>
+                    <div className="flex items-center space-x-4">
+                        <Link to={`/reports/${report._id}`} className="text-teal-500 hover:underline font-medium">
+                        View Details
+                        </Link>
+                        <a href={`http://localhost:3051/api/get_application_pdf/${report._id}`} className="text-teal-500 hover:underline font-medium" download>
+                        Download PDF
+                        </a>
+                        </div>
+                        <button onClick={() => handleDelete(report._id)} className="text-red-500 hover:text-red-700" title="Delete Application">
+                            <FaTrash />
+                            </button>
+                            </div>
                 </div>
               ))}
             </div>
