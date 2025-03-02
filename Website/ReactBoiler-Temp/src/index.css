@@ -1,0 +1,65 @@
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,100..900;1,100..900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Only triggers for children under ul -> li -> a FYI */
+ul>li>#child:hover {
+    text-decoration: underline;
+}
+
+#child {
+    @apply sm:text-lg text-sm
+}
+
+.fancy {
+    --offset: 3px;
+    border-radius: 50px;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Conic gradient */
+.fancy::before {
+    content: '';
+    background: conic-gradient(transparent 270deg, red, transparent);
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    aspect-ratio: 1;
+    width: 100%;
+    animation: rotate 2s linear infinite;
+}
+
+/* Overlay */
+.fancy::after {
+    content: '';
+    background: inherit;
+    border-radius: inherit;
+    position: absolute;
+    inset: var(--offset);
+    height: calc(100% - 2 * var(--offset));
+    width: calc(100% - 2 * var(--offset));
+}
+
+.fancy input {
+    background: transparent;
+    color: white;
+    font-size: 1.5rem;
+    position: absolute;
+    inset: 0;
+    z-index: 10;
+    padding: 1.5rem;
+}
+
+@keyframes rotate {
+    from {
+        transform: translate(-50%, -50%) scale(1.4) rotate(0turn);
+    }
+
+    to {
+        transform: translate(-50%, -50%) scale(1.4) rotate(1turn);
+    }
+}

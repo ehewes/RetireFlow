@@ -1,0 +1,1 @@
+mongodb+srv://priz:<db_password>@cluster0.shytj.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0
