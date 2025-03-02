@@ -326,41 +326,106 @@ app.get("/api/get_application_pdf/:id", async (req: Request, res: Response) => {
     const pdfDoc = await PDFDocument.create();
     const page = pdfDoc.addPage([600, 800]); // Page size: 600pt width, 800pt height
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const fontSize = 12;
-    const lineHeight = fontSize * 1.2;
+    const titleFontSize = 18;
+    const sectionFontSize = 14;
+    const lineHeight = fontSize * 1.5; // Increased for better readability
     let y = page.getHeight() - 50; // Start 50pt from the top
 
-    // Step 3: Define the fields to include in the PDF (matches the text representation)
-    const fields = [
-      { label: "Application ID:", value: application._id.toString() },
-      { label: "Full Name:", value: application.fullName },
-      { label: "Email:", value: application.email },
-      { label: "DOB:", value: application.dob },
-      { label: "NI Number:", value: application.niNumber },
-      { label: "Years of Service:", value: application.yearsOfService.toString() },
-      { label: "Current Salary:", value: application.currentSalary.toString() },
-      { label: "Annuity Type:", value: application.annuityType },
-      { label: "Survivor Benefit:", value: application.survivorBenefit },
-      { label: "Healthcare:", value: application.healthcare },
-      { label: "Retirement Date:", value: application.retirementDate },
-      { label: "Terms Agreed:", value: application.termsAgreed.toString() },
-      { label: "Submission Date:", value: application.submissionDate },
-      { label: "Status:", value: application.status },
+    // Step 3: Add a title
+    page.drawText("Pension Application Details", {
+      x: 50,
+      y: y,
+      size: titleFontSize,
+      font: boldFont,
+      color: rgb(0, 0.53, 0.71), // Teal color for visual appeal
+    });
+    y -= titleFontSize + 20; // Move down after title with extra space
+
+    // Step 4: Define sections and fields
+    const sections = [
+      {
+        title: "Personal Information",
+        fields: [
+          { label: "Full Name:", value: application.fullName },
+          { label: "Email:", value: application.email },
+          { label: "DOB:", value: application.dob },
+          { label: "NI Number:", value: application.niNumber },
+        ],
+      },
+      {
+        title: "Pension Details",
+        fields: [
+          { label: "Years of Service:", value: application.yearsOfService.toString() },
+          { label: "Current Salary:", value: application.currentSalary.toString() },
+          { label: "Annuity Type:", value: application.annuityType },
+          { label: "Survivor Benefit:", value: application.survivorBenefit },
+          { label: "Healthcare:", value: application.healthcare },
+          { label: "Retirement Date:", value: application.retirementDate },
+        ],
+      },
+      {
+        title: "Application Information",
+        fields: [
+          { label: "Application ID:", value: application._id.toString() },
+          { label: "Terms Agreed:", value: application.termsAgreed.toString() },
+          { label: "Submission Date:", value: application.submissionDate },
+          { label: "Status:", value: application.status },
+        ],
+      },
     ];
 
-    // Step 4: Draw each field on the PDF
-    for (const field of fields) {
-      page.drawText(`${field.label} ${field.value}`, {
-        x: 50, // 50pt left margin
+    // Step 5: Draw each section and its fields
+    for (const section of sections) {
+      // Draw section title
+      page.drawText(section.title, {
+        x: 50,
         y: y,
-        size: fontSize,
-        font: font,
-        color: rgb(0, 0, 0), // Black text
+        size: sectionFontSize,
+        font: boldFont,
+        color: rgb(0, 0, 0), // Black for simplicity
       });
-      y -= lineHeight; // Move down for the next line
+      y -= sectionFontSize + 10; // Space after section title
+
+      // Draw fields in the section
+      for (const field of section.fields) {
+        // Draw label in bold
+        page.drawText(field.label, {
+          x: 50,
+          y: y,
+          size: fontSize,
+          font: boldFont,
+          color: rgb(0, 0, 0),
+        });
+
+        // Draw value in regular font, next to the label
+        const labelWidth = boldFont.widthOfTextAtSize(field.label, fontSize);
+        page.drawText(field.value, {
+          x: 50 + labelWidth + 5, // Small gap after label
+          y: y,
+          size: fontSize,
+          font: font,
+          color: rgb(0, 0, 0),
+        });
+
+        y -= lineHeight; // Move down for the next line
+      }
+
+      y -= 10; // Extra space between sections
     }
 
-    // Step 5: Save the PDF and send it as a response
+    // Step 6: Add a footer
+    const footerText = `Generated on ${new Date().toLocaleDateString()}`;
+    page.drawText(footerText, {
+      x: 50,
+      y: 30,
+      size: 10,
+      font: font,
+      color: rgb(0.5, 0.5, 0.5), // Gray color
+    });
+
+    // Step 7: Save the PDF and send it as a response
     const pdfBytes = await pdfDoc.save();
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="application_${id}.pdf"`);
