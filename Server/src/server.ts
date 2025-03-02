@@ -10,6 +10,7 @@ import { queryAssistant } from "./handlers/handleAssistant";
 import mongoose from "mongoose";
 import { handleApplication } from "./handlers/handleApplicationPost";
 import { z } from "zod";
+import { degrees, PDFDocument, rgb, StandardFonts } from 'pdf-lib';
 
 
 dotenv.config();
@@ -307,6 +308,65 @@ app.delete("/api/delete_application/:id", async (req: Request, res: Response) =>
     res.status(200).json({ message: "Application deleted successfully" });
   } catch (error) {
     console.error("Error deleting application:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+app.get("/api/get_application_pdf/:id", async (req: Request, res: Response) => {
+  const id = req.params.id;
+
+  try {
+    // Step 1: Retrieve the application from MongoDB
+    const application = await ApplicationModel.findById(id);
+    if (!application) {
+      return res.status(404).json({ error: "Application not found" });
+    }
+
+    // Step 2: Create a new PDF document
+    const pdfDoc = await PDFDocument.create();
+    const page = pdfDoc.addPage([600, 800]); // Page size: 600pt width, 800pt height
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const fontSize = 12;
+    const lineHeight = fontSize * 1.2;
+    let y = page.getHeight() - 50; // Start 50pt from the top
+
+    // Step 3: Define the fields to include in the PDF (matches the text representation)
+    const fields = [
+      { label: "Application ID:", value: application._id.toString() },
+      { label: "Full Name:", value: application.fullName },
+      { label: "Email:", value: application.email },
+      { label: "DOB:", value: application.dob },
+      { label: "NI Number:", value: application.niNumber },
+      { label: "Years of Service:", value: application.yearsOfService.toString() },
+      { label: "Current Salary:", value: application.currentSalary.toString() },
+      { label: "Annuity Type:", value: application.annuityType },
+      { label: "Survivor Benefit:", value: application.survivorBenefit },
+      { label: "Healthcare:", value: application.healthcare },
+      { label: "Retirement Date:", value: application.retirementDate },
+      { label: "Terms Agreed:", value: application.termsAgreed.toString() },
+      { label: "Submission Date:", value: application.submissionDate },
+      { label: "Status:", value: application.status },
+    ];
+
+    // Step 4: Draw each field on the PDF
+    for (const field of fields) {
+      page.drawText(`${field.label} ${field.value}`, {
+        x: 50, // 50pt left margin
+        y: y,
+        size: fontSize,
+        font: font,
+        color: rgb(0, 0, 0), // Black text
+      });
+      y -= lineHeight; // Move down for the next line
+    }
+
+    // Step 5: Save the PDF and send it as a response
+    const pdfBytes = await pdfDoc.save();
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="application_${id}.pdf"`);
+    res.send(Buffer.from(pdfBytes));
+  } catch (error) {
+    console.error("PDF Generation Error:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
