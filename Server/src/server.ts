@@ -316,51 +316,229 @@ app.get("/api/get_application_pdf/:id", async (req: Request, res: Response) => {
   const id = req.params.id;
 
   try {
-    // Step 1: Retrieve the application from MongoDB
+    // ### Step 1: Retrieve the Application from MongoDB
     const application = await ApplicationModel.findById(id);
     if (!application) {
       return res.status(404).json({ error: "Application not found" });
     }
 
-    // Step 2: Create a new PDF document
-    const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([600, 800]); // Page size: 600pt width, 800pt height
-    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-    const fontSize = 12;
-    const lineHeight = fontSize * 1.2;
-    let y = page.getHeight() - 50; // Start 50pt from the top
+    // ### Step 2: Generate Application Text for AI Prompt
+    const applicationText = `
+Application ID: ${application._id}
+Full Name: ${application.fullName}
+Email: ${application.email}
+DOB: ${application.dob}
+NI Number: ${application.niNumber}
+Years of Service: ${application.yearsOfService}
+Current Salary: ${application.currentSalary}
+Annuity Type: ${application.annuityType}
+Survivor Benefit: ${application.survivorBenefit}
+Healthcare: ${application.healthcare}
+Retirement Date: ${application.retirementDate}
+Terms Agreed: ${application.termsAgreed}
+Submission Date: ${application.submissionDate}
+Status: ${application.status}
+    `.trim();
 
-    // Step 3: Define the fields to include in the PDF (matches the text representation)
-    const fields = [
-      { label: "Application ID:", value: application._id.toString() },
-      { label: "Full Name:", value: application.fullName },
-      { label: "Email:", value: application.email },
-      { label: "DOB:", value: application.dob },
-      { label: "NI Number:", value: application.niNumber },
-      { label: "Years of Service:", value: application.yearsOfService.toString() },
-      { label: "Current Salary:", value: application.currentSalary.toString() },
-      { label: "Annuity Type:", value: application.annuityType },
-      { label: "Survivor Benefit:", value: application.survivorBenefit },
-      { label: "Healthcare:", value: application.healthcare },
-      { label: "Retirement Date:", value: application.retirementDate },
-      { label: "Terms Agreed:", value: application.termsAgreed.toString() },
-      { label: "Submission Date:", value: application.submissionDate },
-      { label: "Status:", value: application.status },
-    ];
+    // ### Step 3: Generate AI Summary Using queryAssistant
+    const prompt = `Please provide a brief summary and any notable points for the following pension application:\n\n${applicationText}`;
+    let summary: string;
+    try {
+      const assistantResponse = await queryAssistant(prompt);
 
-    // Step 4: Draw each field on the PDF
-    for (const field of fields) {
-      page.drawText(`${field.label} ${field.value}`, {
-        x: 50, // 50pt left margin
-        y: y,
-        size: fontSize,
-        font: font,
-        color: rgb(0, 0, 0), // Black text
-      });
-      y -= lineHeight; // Move down for the next line
+      // Log the response for debugging
+      console.log("Assistant response:", assistantResponse);
+
+      // Check and extract the summary from the response
+      if (
+        assistantResponse &&
+        typeof assistantResponse === 'object' &&
+        "value" in assistantResponse &&
+        typeof assistantResponse.value === 'string'
+      ) {
+        summary = assistantResponse.value;
+        // Sanitize special characters to prevent encoding issues
+        summary = summary
+          .replace(/【/g, '[')
+          .replace(/】/g, ']')
+          .replace(/†/g, '-');
+      } else {
+        summary = "Invalid response format from assistant.";
+      }
+
+      // Ensure summary is not empty
+      if (!summary || summary.trim() === "") {
+        summary = "No summary available.";
+      }
+    } catch (error) {
+      console.warn("AI summary generation failed:", error);
+      summary = "Unable to generate summary at this time.";
     }
 
-    // Step 5: Save the PDF and send it as a response
+    const pdfDoc = await PDFDocument.create();
+    let page = pdfDoc.addPage([600, 800]); 
+    const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+    const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+    const fontSize = 12;
+    const titleFontSize = 18;
+    const sectionFontSize = 14;
+    const lineHeight = fontSize * 1.5;
+    let y = page.getHeight() - 50;
+
+    const wrapText = (text: string, font: any, fontSize: number, maxWidth: number): string[] => {
+      const words = text.split(" ");
+      const lines: string[] = [];
+      let currentLine = words[0] || "";
+
+      for (let i = 1; i < words.length; i++) {
+        const word = words[i];
+        const width = font.widthOfTextAtSize(`${currentLine} ${word}`, fontSize);
+        if (width < maxWidth) {
+          currentLine += ` ${word}`;
+        } else {
+          lines.push(currentLine);
+          currentLine = word;
+        }
+      }
+      lines.push(currentLine);
+      return lines;
+    };
+
+    page.drawText("Pension Application Details", {
+      x: 50,
+      y: y,
+      size: titleFontSize,
+      font: boldFont,
+      color: rgb(0, 0.53, 0.71), 
+    });
+    y -= titleFontSize + 20;
+
+    page.drawText("Summary", {
+      x: 50,
+      y: y,
+      size: sectionFontSize,
+      font: boldFont,
+      color: rgb(0, 0, 0),
+    });
+    y -= sectionFontSize + 10;
+
+    // Split summary by newlines and process each paragraph
+    const summaryParagraphs = summary.split('\n');
+    for (const paragraph of summaryParagraphs) {
+      if (paragraph.trim() === '') {
+        // Handle blank lines
+        if (y < 50) {
+          page = pdfDoc.addPage([600, 800]);
+          y = page.getHeight() - 50;
+        }
+        y -= lineHeight;
+      } else {
+        // Wrap and draw non-empty paragraphs
+        const lines = wrapText(paragraph, font, fontSize, 500);
+        for (const line of lines) {
+          if (y < 50) {
+            page = pdfDoc.addPage([600, 800]);
+            y = page.getHeight() - 50;
+          }
+          page.drawText(line, {
+            x: 50,
+            y: y,
+            size: fontSize,
+            font: font,
+            color: rgb(0, 0, 0),
+          });
+          y -= lineHeight;
+        }
+      }
+    }
+    y -= 10; 
+
+    const sections = [
+      {
+        title: "Personal Information",
+        fields: [
+          { label: "Full Name:", value: application.fullName },
+          { label: "Email:", value: application.email },
+          { label: "DOB:", value: application.dob },
+          { label: "NI Number:", value: application.niNumber },
+        ],
+      },
+      {
+        title: "Pension Details",
+        fields: [
+          { label: "Years of Service:", value: application.yearsOfService.toString() },
+          { label: "Current Salary:", value: application.currentSalary.toString() },
+          { label: "Annuity Type:", value: application.annuityType },
+          { label: "Survivor Benefit:", value: application.survivorBenefit },
+          { label: "Healthcare:", value: application.healthcare },
+          { label: "Retirement Date:", value: application.retirementDate },
+        ],
+      },
+      {
+        title: "Application Information",
+        fields: [
+          { label: "Application ID:", value: application._id.toString() },
+          { label: "Terms Agreed:", value: application.termsAgreed.toString() },
+          { label: "Submission Date:", value: application.submissionDate },
+          { label: "Status:", value: application.status },
+        ],
+      },
+    ];
+
+    for (const section of sections) {
+      if (y < 50) {
+        page = pdfDoc.addPage([600, 800]);
+        y = page.getHeight() - 50;
+      }
+      page.drawText(section.title, {
+        x: 50,
+        y: y,
+        size: sectionFontSize,
+        font: boldFont,
+        color: rgb(0, 0, 0),
+      });
+      y -= sectionFontSize + 10;
+
+      for (const field of section.fields) {
+        if (y < 50) {
+          page = pdfDoc.addPage([600, 800]);
+          y = page.getHeight() - 50;
+        }
+        page.drawText(field.label, {
+          x: 50,
+          y: y,
+          size: fontSize,
+          font: boldFont,
+          color: rgb(0, 0, 0),
+        });
+
+        const labelWidth = boldFont.widthOfTextAtSize(field.label, fontSize);
+        page.drawText(field.value, {
+          x: 50 + labelWidth + 5,
+          y: y,
+          size: fontSize,
+          font: font,
+          color: rgb(0, 0, 0),
+        });
+        y -= lineHeight;
+      }
+      y -= 10;
+    }
+
+    // ### Step 9: Add Footer
+    if (y < 50) {
+      page = pdfDoc.addPage([600, 800]);
+      y = page.getHeight() - 50;
+    }
+    const footerText = `Generated on ${new Date().toLocaleDateString()}`;
+    page.drawText(footerText, {
+      x: 50,
+      y: 30,
+      size: 10,
+      font: font,
+      color: rgb(0.5, 0.5, 0.5),
+    });
+
     const pdfBytes = await pdfDoc.save();
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="application_${id}.pdf"`);
