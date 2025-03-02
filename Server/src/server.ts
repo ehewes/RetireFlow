@@ -316,34 +316,143 @@ app.get("/api/get_application_pdf/:id", async (req: Request, res: Response) => {
   const id = req.params.id;
 
   try {
-    // Step 1: Retrieve the application from MongoDB
+    // ### Step 1: Retrieve the Application from MongoDB
     const application = await ApplicationModel.findById(id);
     if (!application) {
       return res.status(404).json({ error: "Application not found" });
     }
 
-    // Step 2: Create a new PDF document
+    // ### Step 2: Generate Application Text for AI Prompt
+    const applicationText = `
+Application ID: ${application._id}
+Full Name: ${application.fullName}
+Email: ${application.email}
+DOB: ${application.dob}
+NI Number: ${application.niNumber}
+Years of Service: ${application.yearsOfService}
+Current Salary: ${application.currentSalary}
+Annuity Type: ${application.annuityType}
+Survivor Benefit: ${application.survivorBenefit}
+Healthcare: ${application.healthcare}
+Retirement Date: ${application.retirementDate}
+Terms Agreed: ${application.termsAgreed}
+Submission Date: ${application.submissionDate}
+Status: ${application.status}
+    `.trim();
+
+    // ### Step 3: Generate AI Summary Using queryAssistant
+    const prompt = `Please provide a brief summary and any notable points for the following pension application:\n\n${applicationText}`;
+    let summary: string;
+    try {
+      const assistantResponse = await queryAssistant(prompt);
+
+      // Log the response for debugging
+      console.log("Assistant response:", assistantResponse);
+
+      // Check and extract the summary from the response
+      if (
+        assistantResponse &&
+        typeof assistantResponse === 'object' &&
+        "value" in assistantResponse &&
+        typeof assistantResponse.value === 'string'
+      ) {
+        summary = assistantResponse.value;
+        // Sanitize special characters to prevent encoding issues
+        summary = summary
+          .replace(/【/g, '[')
+          .replace(/】/g, ']')
+          .replace(/†/g, '-');
+      } else {
+        summary = "Invalid response format from assistant.";
+      }
+
+      // Ensure summary is not empty
+      if (!summary || summary.trim() === "") {
+        summary = "No summary available.";
+      }
+    } catch (error) {
+      console.warn("AI summary generation failed:", error);
+      summary = "Unable to generate summary at this time.";
+    }
+
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([600, 800]); // Page size: 600pt width, 800pt height
+    let page = pdfDoc.addPage([600, 800]); 
     const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
     const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const fontSize = 12;
     const titleFontSize = 18;
     const sectionFontSize = 14;
-    const lineHeight = fontSize * 1.5; // Increased for better readability
-    let y = page.getHeight() - 50; // Start 50pt from the top
+    const lineHeight = fontSize * 1.5;
+    let y = page.getHeight() - 50;
 
-    // Step 3: Add a title
+    const wrapText = (text: string, font: any, fontSize: number, maxWidth: number): string[] => {
+      const words = text.split(" ");
+      const lines: string[] = [];
+      let currentLine = words[0] || "";
+
+      for (let i = 1; i < words.length; i++) {
+        const word = words[i];
+        const width = font.widthOfTextAtSize(`${currentLine} ${word}`, fontSize);
+        if (width < maxWidth) {
+          currentLine += ` ${word}`;
+        } else {
+          lines.push(currentLine);
+          currentLine = word;
+        }
+      }
+      lines.push(currentLine);
+      return lines;
+    };
+
     page.drawText("Pension Application Details", {
       x: 50,
       y: y,
       size: titleFontSize,
       font: boldFont,
-      color: rgb(0, 0.53, 0.71), // Teal color for visual appeal
+      color: rgb(0, 0.53, 0.71), 
     });
-    y -= titleFontSize + 20; // Move down after title with extra space
+    y -= titleFontSize + 20;
 
-    // Step 4: Define sections and fields
+    page.drawText("Summary", {
+      x: 50,
+      y: y,
+      size: sectionFontSize,
+      font: boldFont,
+      color: rgb(0, 0, 0),
+    });
+    y -= sectionFontSize + 10;
+
+    // Split summary by newlines and process each paragraph
+    const summaryParagraphs = summary.split('\n');
+    for (const paragraph of summaryParagraphs) {
+      if (paragraph.trim() === '') {
+        // Handle blank lines
+        if (y < 50) {
+          page = pdfDoc.addPage([600, 800]);
+          y = page.getHeight() - 50;
+        }
+        y -= lineHeight;
+      } else {
+        // Wrap and draw non-empty paragraphs
+        const lines = wrapText(paragraph, font, fontSize, 500);
+        for (const line of lines) {
+          if (y < 50) {
+            page = pdfDoc.addPage([600, 800]);
+            y = page.getHeight() - 50;
+          }
+          page.drawText(line, {
+            x: 50,
+            y: y,
+            size: fontSize,
+            font: font,
+            color: rgb(0, 0, 0),
+          });
+          y -= lineHeight;
+        }
+      }
+    }
+    y -= 10; 
+
     const sections = [
       {
         title: "Personal Information",
@@ -376,21 +485,25 @@ app.get("/api/get_application_pdf/:id", async (req: Request, res: Response) => {
       },
     ];
 
-    // Step 5: Draw each section and its fields
     for (const section of sections) {
-      // Draw section title
+      if (y < 50) {
+        page = pdfDoc.addPage([600, 800]);
+        y = page.getHeight() - 50;
+      }
       page.drawText(section.title, {
         x: 50,
         y: y,
         size: sectionFontSize,
         font: boldFont,
-        color: rgb(0, 0, 0), // Black for simplicity
+        color: rgb(0, 0, 0),
       });
-      y -= sectionFontSize + 10; // Space after section title
+      y -= sectionFontSize + 10;
 
-      // Draw fields in the section
       for (const field of section.fields) {
-        // Draw label in bold
+        if (y < 50) {
+          page = pdfDoc.addPage([600, 800]);
+          y = page.getHeight() - 50;
+        }
         page.drawText(field.label, {
           x: 50,
           y: y,
@@ -399,33 +512,33 @@ app.get("/api/get_application_pdf/:id", async (req: Request, res: Response) => {
           color: rgb(0, 0, 0),
         });
 
-        // Draw value in regular font, next to the label
         const labelWidth = boldFont.widthOfTextAtSize(field.label, fontSize);
         page.drawText(field.value, {
-          x: 50 + labelWidth + 5, // Small gap after label
+          x: 50 + labelWidth + 5,
           y: y,
           size: fontSize,
           font: font,
           color: rgb(0, 0, 0),
         });
-
-        y -= lineHeight; // Move down for the next line
+        y -= lineHeight;
       }
-
-      y -= 10; // Extra space between sections
+      y -= 10;
     }
 
-    // Step 6: Add a footer
+    // ### Step 9: Add Footer
+    if (y < 50) {
+      page = pdfDoc.addPage([600, 800]);
+      y = page.getHeight() - 50;
+    }
     const footerText = `Generated on ${new Date().toLocaleDateString()}`;
     page.drawText(footerText, {
       x: 50,
       y: 30,
       size: 10,
       font: font,
-      color: rgb(0.5, 0.5, 0.5), // Gray color
+      color: rgb(0.5, 0.5, 0.5),
     });
 
-    // Step 7: Save the PDF and send it as a response
     const pdfBytes = await pdfDoc.save();
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="application_${id}.pdf"`);
