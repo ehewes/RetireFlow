@@ -10,6 +10,7 @@ import Pension from '../Pages/PensionForm/Pension';
 import PrivateRoute from "./PrivateRoute";
 import Agent from '../Pages/Agent/Agent';
 import Profile from '../Pages/Profile/Profile';
+import FAQ from '../Pages/FAQ/FAQ';
 
 const Routes = createBrowserRouter([
     {
@@ -49,6 +50,10 @@ const Routes = createBrowserRouter([
             {
                 path: "/profile",
                 element: <PrivateRoute><Profile></Profile></PrivateRoute>
+            },
+            {
+                path: "/faq",
+                element: <FAQ></FAQ>
             }
         ]
     },
