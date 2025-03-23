@@ -22,7 +22,7 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY || "",
 });
 
-const MONGODB_URI = "mongodb+srv://priz:AwOJmW4FxRbyIhzE@cluster0.shytj.mongodb.net/pensionDB?retryWrites=true&w=majority&appName=Cluster0";
+const MONGODB_URI = `${process.env.DB_URI}`;
 mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true,

@@ -57,15 +57,15 @@ export default function Header() {
             Features
           </NextUILink>
         </NavbarItem>
-        <NavbarItem isActive={location.pathname === "/customers"}>
+        <NavbarItem isActive={location.pathname === "/faq"}>
           <NextUILink
             as={Link}
-            color={location.pathname === "/customers" ? "primary" : "foreground"}
-            to="/customers"
+            color={location.pathname === "/faq" ? "primary" : "foreground"}
+            to="/faq"
             className="text-[#fff] text-1xl font-bold hover:text-purple-400 transition-colors duration-300 ease-in-out"
-            aria-current={location.pathname === "/customers" ? "page" : undefined}
+            aria-current={location.pathname === "/faq" ? "page" : undefined}
           >
-            Customers
+            FAQ
           </NextUILink>
         </NavbarItem>
         {user && (

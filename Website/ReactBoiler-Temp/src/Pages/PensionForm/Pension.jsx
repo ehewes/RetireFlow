@@ -3,9 +3,11 @@ import AOS from 'aos';
 import 'aos/dist/aos.css';
 import { Link } from 'react-router-dom';
 import { AuthContext } from "../../Providers/AuthProvider"; // Adjust path if needed
+import { useNavigate } from 'react-router-dom';
 
 const PensionForm = () => {
   const { user } = useContext(AuthContext);
+  const navigate = useNavigate();
 
   useEffect(() => {
     AOS.init({
@@ -68,6 +70,7 @@ const PensionForm = () => {
       const result = await response.json();
       console.log('Submission successful:', result);
       alert('Application submitted successfully!');
+      navigate('/');
 
       // Optional: Reset form after successful submission
       setFormData({
