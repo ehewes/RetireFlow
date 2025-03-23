@@ -1,13 +1,10 @@
-# WIP
-
-
-
+# RetireFlow
+### HackLondon 2025 Submission
 ## **Potential Ideas**
 - https://www.videcom.com
 Modernise this, flight reservation system. Still highly used within the industry and could add some type of AI scheduling. ( anything AI 🤣 )
 
-- LimeStone Mine Retirement System
-
+- RetireFlow, pension processing system to update a legacy industry.
 
 # Pension Processing System Modernization
 
@@ -70,5 +67,3 @@ For the hackathon, we’ve designed a digital alternative using **vector search*
 - **Digital**: Fully automated, eliminating paper.
 - **Accuracy**: Semantic matching reduces human error.
 - **User-Friendly**: Offers instant feedback and accessible results.
-
-This hackathon concept demonstrates how vector search can transform an inefficient, analog system into a modern, scalable solution.
